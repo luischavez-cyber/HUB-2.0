@@ -21,6 +21,10 @@ from ..laboratorio.extractor import extraer
 from ..normativa.evaluacion import evaluar, resumen
 from ..normativa.nom138 import NORMA, PARAMETROS, PRODUCTOS, REFERENCIAS, UNIDAD, UsoSuelo, parametros_requeridos
 from ..proyectos import CAMPOS_FICHA, Proyecto, campos_faltantes
+from ..revision import dictamen
+from ..revision.indice import CATEGORIAS as CATEGORIAS_HALLAZGO
+from ..revision.indice import CRITICIDADES, calcular_ict
+from ..revision.registro import ESTADOS, actualizar_hallazgo, hallazgos_de, listar_revisiones, revisar_borrador
 from ..tablero import MODULOS, estado
 
 
@@ -126,6 +130,28 @@ DEFINICIONES: list[dict[str, Any]] = [
     {"name": "generar_seccion_fotografica",
      "description": "Genera en Word la sección fotográfica ordenada por categoría y numerada, lista para el informe.",
      "input_schema": _obj({"titulo": _S})},
+    {"name": "listar_borradores",
+     "description": "Borradores del informe cargados al proyecto y sus revisiones técnicas (ICT original y vigente).",
+     "input_schema": _obj({})},
+    {"name": "revisar_informe",
+     "description": "Revisión técnica del borrador desde la perspectiva de SEMARNAT/ASEA: verificaciones automáticas "
+                    "contra la base del proyecto y la NOM-138 y, con usar_ia=true, revisión completa con IA. Guarda "
+                    "la revisión y devuelve el Índice de Calidad Técnica (0-100) y el conteo de hallazgos.",
+     "input_schema": _obj({"documento_id": {"type": "integer"}, "usar_ia": {"type": "boolean"}}, ["documento_id"])},
+    {"name": "consultar_revision",
+     "description": "Hallazgos de una revisión (por omisión, la más reciente), con filtros por criticidad y estado.",
+     "input_schema": _obj({"revision_id": {"type": "integer"},
+                           "criticidad": {"type": "string", "enum": list(CRITICIDADES)},
+                           "estado": {"type": "string", "enum": list(ESTADOS)}})},
+    {"name": "actualizar_hallazgo",
+     "description": "Marca un hallazgo como atendido, descartado (requiere justificación en la nota) o abierto. "
+                    "Solo con confirmación del usuario.",
+     "input_schema": _obj({"id": {"type": "integer"}, "estado": {"type": "string", "enum": list(ESTADOS)},
+                           "nota": _S}, ["id", "estado"])},
+    {"name": "exportar_revision",
+     "description": "Genera el dictamen de revisión técnica en Word o la matriz de hallazgos en Excel.",
+     "input_schema": _obj({"revision_id": {"type": "integer"},
+                           "formato": {"type": "string", "enum": ["word", "excel"]}}, ["formato"])},
     {"name": "consultar_bitacora", "description": "Últimos cambios registrados (quién, cuándo, antes/después).",
      "input_schema": _obj({"limite": {"type": "integer"}})},
 ]
@@ -307,6 +333,69 @@ def _seccion_fotografica(ctx: Contexto, titulo: str = "Memoria fotográfica") ->
     return {"archivo": destino.name, "avisos": avisos}
 
 
+def _listar_borradores(ctx: Contexto) -> Any:
+    p = ctx.abrir()
+    revs = listar_revisiones(p)
+    return [{"documento_id": d["id"], "nombre": d["nombre"], "cargado": d["cargado"],
+             "revisiones": [{"revision_id": r["id"], "fecha": r["fecha"], "ict": r["ict"],
+                             "ict_vigente": r["ict_vigente"], "usa_ia": bool(r["usa_ia"])}
+                            for r in revs if r["documento_id"] == d["id"]]}
+            for d in p.documentos("borrador")]
+
+
+def _revisar_informe(ctx: Contexto, documento_id: int, usar_ia: bool = True) -> Any:
+    p = ctx.abrir()
+    rev_id = revisar_borrador(p, documento_id, usar_ia=usar_ia, cliente=ctx.cliente if usar_ia else None)
+    rev = next(r for r in listar_revisiones(p) if r["id"] == rev_id)
+    hs = hallazgos_de(p, rev_id)
+    return {"revision_id": rev_id, "ict": rev["ict"], "interpretacion": rev["interpretacion"],
+            "subindices": rev["subindices"], "aviso": rev["aviso"],
+            "hallazgos_por_criticidad": {c: sum(1 for h in hs if h.criticidad == c) for c in CRITICIDADES},
+            "resumen_ia": rev["resumen"]}
+
+
+def _revision(ctx: Contexto, revision_id: int | None) -> tuple[Proyecto, dict[str, Any]]:
+    p = ctx.abrir()
+    revs = listar_revisiones(p)
+    if not revs:
+        raise ErrorHerramienta("No hay revisiones; use revisar_informe")
+    rev = revs[0] if revision_id is None else next((r for r in revs if r["id"] == revision_id), None)
+    if rev is None:
+        raise ErrorHerramienta(f"No existe la revisión {revision_id}")
+    return p, rev
+
+
+def _consultar_revision(ctx: Contexto, revision_id: int | None = None, criticidad: str | None = None,
+                        estado: str | None = None) -> Any:
+    p, rev = _revision(ctx, revision_id)
+    hs = hallazgos_de(p, rev["id"])
+    return {"revision_id": rev["id"], "documento": rev["documento"], "ict_vigente": calcular_ict(hs)["ict"],
+            "hallazgos": [{"id": h.id, "origen": h.origen, "criticidad": h.criticidad,
+                           "categoria": CATEGORIAS_HALLAZGO[h.categoria][0], "ubicacion": h.ubicacion,
+                           "descripcion": h.descripcion, "evidencia": h.evidencia[:300],
+                           "evidencia_localizada": h.evidencia_localizada, "riesgo": h.riesgo,
+                           "recomendacion": h.recomendacion, "referencia": h.referencia, "estado": h.estado,
+                           "nota": h.nota}
+                          for h in hs if (not criticidad or h.criticidad == criticidad)
+                          and (not estado or h.estado == estado)]}
+
+
+def _actualizar_hallazgo(ctx: Contexto, id: int, estado: str, nota: str = "") -> Any:
+    actualizar_hallazgo(ctx.abrir(), id, estado, nota)
+    return {"id": id, "estado": estado}
+
+
+def _exportar_revision(ctx: Contexto, formato: str, revision_id: int | None = None) -> Any:
+    p, rev = _revision(ctx, revision_id)
+    contenido, ext, sufijo = ((dictamen.a_word(p, rev["id"]), "docx", "dictamen") if formato == "word"
+                              else (dictamen.a_excel(p, rev["id"]), "xlsx", "hallazgos"))
+    destino = p.ruta / "archivos" / "exportaciones" / f"{p.clave}_revision{rev['id']}_{sufijo}.{ext}"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_bytes(contenido)
+    ctx.archivos_generados.append(destino)
+    return {"archivo": destino.name}
+
+
 def _crear_version(ctx: Contexto, etiqueta: str) -> Any:
     return {"version": ctx.abrir().crear_instantanea(etiqueta).name}
 
@@ -333,6 +422,11 @@ IMPLEMENTACIONES: dict[str, Callable[..., Any]] = {
     "clasificar_fotografias": _clasificar_fotografias,
     "actualizar_fotografia": _actualizar_fotografia,
     "generar_seccion_fotografica": _seccion_fotografica,
+    "listar_borradores": _listar_borradores,
+    "revisar_informe": _revisar_informe,
+    "consultar_revision": _consultar_revision,
+    "actualizar_hallazgo": _actualizar_hallazgo,
+    "exportar_revision": _exportar_revision,
     "crear_version": _crear_version,
     "consultar_bitacora": _consultar_bitacora,
 }

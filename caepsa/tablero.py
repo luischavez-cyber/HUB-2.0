@@ -8,6 +8,7 @@ from .fotografia.registro import diagnostico
 from .normativa.evaluacion import EXCEDE, INDETERMINADO, evaluar
 from .normativa.nom138 import PARAMETROS
 from .proyectos import CAMPOS_FICHA, Proyecto, campos_faltantes
+from .revision.registro import hallazgos_de, listar_revisiones
 
 MODULOS = (
     (1, "Gestión de Proyectos"),
@@ -18,7 +19,7 @@ MODULOS = (
     (6, "Análisis de Dispersión"),
     (7, "Generación de Informes"),
 )
-DISPONIBLES = {1, 2, 3, 4}
+DISPONIBLES = {1, 2, 3, 4, 5}
 
 
 @dataclass
@@ -109,6 +110,22 @@ def estado(p: Proyecto) -> tuple[dict[int, float], list[Alerta]]:
             alertas.append(Alerta("info", 4, "Sin evidencia fotográfica de: " + ", ".join(faltan)))
     else:
         alertas.append(Alerta("media", 4, "No se han cargado fotografías del proyecto"))
+
+    # Módulo 5
+    revisiones = listar_revisiones(p)
+    if revisiones:
+        ultima = revisiones[0]
+        avance[5] = ultima["ict_vigente"] / 100
+        abiertos = [h for h in hallazgos_de(p, ultima["id"]) if h.estado == "abierto"]
+        criticos = sum(1 for h in abiertos if h.criticidad == "critica")
+        if criticos:
+            alertas.append(Alerta("alta", 5, f"{criticos} hallazgo(s) crítico(s) abiertos en la última revisión "
+                                             f"({ultima['documento']}, ICT {ultima['ict_vigente']:.0f})"))
+        elif abiertos:
+            alertas.append(Alerta("media", 5, f"{len(abiertos)} hallazgo(s) abiertos en la última revisión "
+                                              f"(ICT {ultima['ict_vigente']:.0f})"))
+    elif p.documentos("borrador"):
+        alertas.append(Alerta("media", 5, "Hay borradores cargados sin revisión técnica"))
 
     for n, nombre in MODULOS:
         if n not in DISPONIBLES:

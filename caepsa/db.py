@@ -80,6 +80,36 @@ CREATE TABLE IF NOT EXISTS fotografias (
     revisada          INTEGER NOT NULL DEFAULT 0,
     incluir           INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS revisiones (
+    id             INTEGER PRIMARY KEY,
+    documento_id   INTEGER NOT NULL REFERENCES documentos(id) ON DELETE CASCADE,
+    fecha          TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    usuario        TEXT,
+    ict            REAL NOT NULL,
+    subindices     TEXT NOT NULL,
+    interpretacion TEXT,
+    resumen        TEXT,
+    fortalezas     TEXT,
+    usa_ia         INTEGER NOT NULL DEFAULT 0,
+    modelo         TEXT,
+    aviso          TEXT
+);
+CREATE TABLE IF NOT EXISTS hallazgos (
+    id                    INTEGER PRIMARY KEY,
+    revision_id           INTEGER NOT NULL REFERENCES revisiones(id) ON DELETE CASCADE,
+    origen                TEXT NOT NULL,
+    categoria             TEXT NOT NULL,
+    criticidad            TEXT NOT NULL,
+    ubicacion             TEXT,
+    descripcion           TEXT NOT NULL,
+    evidencia             TEXT,
+    riesgo                TEXT,
+    recomendacion         TEXT,
+    referencia            TEXT,
+    evidencia_localizada  INTEGER,
+    estado                TEXT NOT NULL DEFAULT 'abierto',
+    nota                  TEXT
+);
 CREATE TABLE IF NOT EXISTS bitacora (
     id        INTEGER PRIMARY KEY,
     fecha     TEXT NOT NULL DEFAULT (datetime('now','localtime')),

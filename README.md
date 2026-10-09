@@ -22,7 +22,7 @@ Los datos se guardan en `./workspace` (cámbielo con `CAEPSA_WORKSPACE`). Prueba
 
 Agente conversacional (Claude, con uso de herramientas) que opera toda la plataforma: crea y actualiza proyectos,
 recibe el PDF del laboratorio en el chat, extrae y guarda resultados, evalúa contra la NOM-138, informa
-alertas, clasifica fotografías y exporta tablas Excel/Word y la sección fotográfica. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
+alertas, clasifica fotografías, revisa el borrador del informe y exporta tablas Excel/Word y la sección fotográfica. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
 (`caepsa/asistente/herramientas.py`), que llaman al mismo motor determinista que usan las pantallas. Cada
 acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 
@@ -34,7 +34,7 @@ acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 | 2 | Extracción de resultados de laboratorio (pdfplumber) + captura/corrección manual + importación CSV | ✅ Etapa 1 |
 | 3 | Evaluación NOM-138: LMP por uso de suelo (Tablas 2 y 3), parámetros por producto (Tabla 1), uso mixto = más estricto, tabla filtrable por zona/estado, exportación Excel y Word | ✅ Etapa 1 |
 | 4 | Gestión fotográfica: clasificación por etapa y pies técnicos ≤ 15 palabras con Claude Vision, EXIF (fecha, GPS→UTM) y asociación automática al punto de muestreo más cercano (≤ 30 m), reclasificación manual que la IA no sobrescribe, sección fotográfica en Word | ✅ Etapa 2 |
-| 5 | Revisión técnica ambiental (perspectiva SEMARNAT/ASEA, Índice de Calidad Técnica 0–100) | Etapa 3 |
+| 5 | Revisión técnica ambiental: verificaciones automáticas contra la base del proyecto y la NOM-138 + revisión completa con IA desde la perspectiva SEMARNAT/ASEA, hallazgos con criticidad, riesgo y recomendación, Índice de Calidad Técnica 0–100, historial por versión del borrador, dictamen Word y matriz Excel | ✅ Etapa 3 |
 | 6 | Análisis de dispersión de hidrocarburos (Capítulo 5) | Etapa 4 |
 | 7 | Generación del informe completo en Word | Etapa 5 |
 
@@ -54,8 +54,30 @@ describe solo lo observable y no afirma presencia ni concentración de contamina
 15 palabras se le pide que lo reduzca una vez; si persiste queda marcado para revisión. Las propuestas de la IA
 quedan como "pendientes de revisión" hasta que una persona las confirma.
 
+## Revisión técnica (Módulo 5)
+
+El borrador (.docx o .pdf) se revisa en dos capas:
+
+1. **Verificaciones automáticas** (deterministas, con la celda o cita que las origina): cita de la NOM-138 vigente
+   (y uso de la versión 2003 sustituida), LMP citados contra el catálogo para el uso de suelo del proyecto, valores
+   de las tablas contra los resultados del laboratorio, dictamen «Cumple» en muestras que exceden, afirmaciones de
+   cumplimiento contrarias a los resultados, muestras que exceden y no se mencionan, uso de suelo distinto al del
+   proyecto, conteos de muestras y puntos, coordenadas fuera de rango o distintas a las registradas, fechas
+   inválidas y fechas de muestreo omitidas, unidades, secciones esperadas, cadena de custodia y acreditación.
+2. **Revisión con IA** (Claude) como dictaminador de la autoridad: información insuficiente, ambigua o
+   contradictoria, vacíos respecto a la NOM-138 y recomendaciones. Cada hallazgo trae cita textual; si la cita no
+   se encuentra en el documento, se marca y pesa la mitad en el índice. Documentos muy grandes no se truncan: se
+   pide dividirlos.
+
+**Índice de Calidad Técnica** = Σ peso × subíndice, con subíndice = 100 − penalizaciones (crítica 20, alta 10,
+media 5, baja 2, informativa 0) por dimensión: consistencia de datos 35 %, sustento normativo 30 %, completitud
+20 %, claridad 15 %. ≥ 85 apto para ingreso; 70–84 ajustes menores; 50–69 correcciones importantes; < 50 no apto.
+Un hallazgo solo se descarta con justificación (queda en bitácora); el «ICT vigente» excluye los descartados.
+
 ## Pendientes de datos reales
 
 - El extractor se probó con PDFs sintéticos en dos formatos comunes (por muestra y matricial). Debe calibrarse con
   el **PDF real de NOVALABSA** (42 muestras, 17 puntos), que no estaba disponible en el repositorio.
+- Las secciones esperadas del informe (Módulo 5) siguen la estructura definida por CAEPSA; deben ajustarse al
+  **Informe de Nueva Italia** cuando esté disponible (`SECCIONES_ESPERADAS` en `caepsa/revision/verificaciones.py`).
 - Plantilla de captura: `data/plantilla_resultados.csv`.
