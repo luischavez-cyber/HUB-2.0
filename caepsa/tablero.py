@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .fotografia.clasificador import CATEGORIAS
+from .fotografia.registro import diagnostico
 from .normativa.evaluacion import EXCEDE, INDETERMINADO, evaluar
 from .normativa.nom138 import PARAMETROS
 from .proyectos import CAMPOS_FICHA, Proyecto, campos_faltantes
@@ -16,7 +18,7 @@ MODULOS = (
     (6, "Análisis de Dispersión"),
     (7, "Generación de Informes"),
 )
-DISPONIBLES = {1, 2, 3}
+DISPONIBLES = {1, 2, 3, 4}
 
 
 @dataclass
@@ -87,6 +89,27 @@ def estado(p: Proyecto) -> tuple[dict[int, float], list[Alerta]]:
         if indet:
             alertas.append(Alerta("media", 3, f"{len(indet)} muestra(s) con dictamen indeterminado "
                                               "(parámetros de Tabla 1 faltantes o LD > LMP)"))
+    # Módulo 4
+    d = diagnostico(p)
+    if d["total"]:
+        incluidas = sum(d["por_categoria"].values()) + len(d["sin_clasificar"])
+        clasificadas = incluidas - len(d["sin_clasificar"])
+        revisadas = clasificadas - len(d["sin_revisar"])
+        avance[4] = (clasificadas + revisadas) / (2 * incluidas) if incluidas else 0.0
+        if d["sin_clasificar"]:
+            alertas.append(Alerta("media", 4, f"{len(d['sin_clasificar'])} fotografía(s) sin clasificar o sin pie"))
+        if d["sin_revisar"]:
+            alertas.append(Alerta("media", 4, f"{len(d['sin_revisar'])} fotografía(s) clasificadas por IA "
+                                              "pendientes de revisión"))
+        if d["pies_largos"]:
+            alertas.append(Alerta("media", 4, f"{len(d['pies_largos'])} pie(s) de foto con más de 15 palabras"))
+        faltan = [CATEGORIAS[c][0] for c in ("reconocimiento", "muestreo", "laboratorio", "cierre")
+                  if not d["por_categoria"][c]]
+        if faltan:
+            alertas.append(Alerta("info", 4, "Sin evidencia fotográfica de: " + ", ".join(faltan)))
+    else:
+        alertas.append(Alerta("media", 4, "No se han cargado fotografías del proyecto"))
+
     for n, nombre in MODULOS:
         if n not in DISPONIBLES:
             alertas.append(Alerta("info", n, f"{nombre}: módulo programado para una etapa posterior"))

@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..exportacion.tablas import a_excel, a_word
+from ..fotografia.clasificador import CATEGORIAS, MAX_PALABRAS, contar_palabras
+from ..fotografia.registro import actualizar_fotografia, clasificar_fotografias, listar_fotografias
+from ..fotografia.seccion import generar_word as seccion_fotografica_word
 from ..laboratorio.captura import guardar_extraccion, importar_filas
 from ..laboratorio.extractor import extraer
 from ..normativa.evaluacion import evaluar, resumen
@@ -28,6 +31,7 @@ class Contexto:
     usuario: str = "asistente"
     proyecto: str | None = None
     archivos_generados: list[Path] = field(default_factory=list)
+    cliente: Any = None  # cliente de la API para herramientas que usan visión
 
     def abrir(self) -> Proyecto:
         if not self.proyecto:
@@ -104,6 +108,24 @@ DEFINICIONES: list[dict[str, Any]] = [
     {"name": "crear_version",
      "description": "Guarda una instantánea de la base del proyecto (control de versiones).",
      "input_schema": _obj({"etiqueta": _S}, ["etiqueta"])},
+    {"name": "listar_fotografias",
+     "description": "Fotografías del proyecto activo con categoría, pie de foto, número de palabras, confianza de "
+                    "la IA, si ya fue revisada por una persona, punto de muestreo asociado y fecha de toma.",
+     "input_schema": _obj({"categoria": {"type": "string", "enum": list(CATEGORIAS)}})},
+    {"name": "clasificar_fotografias",
+     "description": "Clasifica con visión artificial las fotografías y genera pies técnicos de máximo "
+                    f"{MAX_PALABRAS} palabras. Sin 'ids' procesa solo las pendientes. No pisa correcciones "
+                    "manuales salvo forzar=true.",
+     "input_schema": _obj({"ids": {"type": "array", "items": {"type": "integer"}}, "forzar": {"type": "boolean"}})},
+    {"name": "actualizar_fotografia",
+     "description": "Reclasifica o corrige una fotografía: categoría, pie (máx. 15 palabras), punto de muestreo, "
+                    "orden dentro de su categoría, si se incluye en el informe y si quedó revisada.",
+     "input_schema": _obj({"id": {"type": "integer"}, "categoria": {"type": "string", "enum": list(CATEGORIAS)},
+                           "pie": _S, "punto": _S, "orden": {"type": "integer"}, "incluir": {"type": "boolean"},
+                           "revisada": {"type": "boolean"}}, ["id"])},
+    {"name": "generar_seccion_fotografica",
+     "description": "Genera en Word la sección fotográfica ordenada por categoría y numerada, lista para el informe.",
+     "input_schema": _obj({"titulo": _S})},
     {"name": "consultar_bitacora", "description": "Últimos cambios registrados (quién, cuándo, antes/después).",
      "input_schema": _obj({"limite": {"type": "integer"}})},
 ]
@@ -255,6 +277,36 @@ def _exportar(ctx: Contexto, formato: str, zona: str | None = None) -> Any:
     return {"archivo": destino.name, "muestras": len(muestras)}
 
 
+def _listar_fotografias(ctx: Contexto, categoria: str | None = None) -> Any:
+    campos = ("id", "nombre", "categoria", "categoria_origen", "pie", "pie_origen", "confianza", "observacion",
+              "punto", "fecha_toma", "orden", "revisada", "incluir")
+    return [{**{k: f[k] for k in campos}, "palabras": contar_palabras(f["pie"] or "")}
+            for f in listar_fotografias(ctx.abrir(), categoria)]
+
+
+def _clasificar_fotografias(ctx: Contexto, ids: list[int] | None = None, forzar: bool = False) -> Any:
+    return clasificar_fotografias(ctx.abrir(), cliente=ctx.cliente, ids=ids, forzar=forzar)
+
+
+def _actualizar_fotografia(ctx: Contexto, id: int, **campos: Any) -> Any:
+    if campos.get("pie") and contar_palabras(campos["pie"]) > MAX_PALABRAS:
+        raise ErrorHerramienta(f"El pie tiene {contar_palabras(campos['pie'])} palabras; máximo {MAX_PALABRAS}")
+    for k in ("incluir", "revisada"):
+        if k in campos:
+            campos[k] = int(bool(campos[k]))
+    return {"cambios": actualizar_fotografia(ctx.abrir(), id, origen="asistente", **campos)}
+
+
+def _seccion_fotografica(ctx: Contexto, titulo: str = "Memoria fotográfica") -> Any:
+    p = ctx.abrir()
+    contenido, avisos = seccion_fotografica_word(p, titulo)
+    destino = p.ruta / "archivos" / "exportaciones" / f"{p.clave}_seccion_fotografica.docx"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_bytes(contenido)
+    ctx.archivos_generados.append(destino)
+    return {"archivo": destino.name, "avisos": avisos}
+
+
 def _crear_version(ctx: Contexto, etiqueta: str) -> Any:
     return {"version": ctx.abrir().crear_instantanea(etiqueta).name}
 
@@ -277,6 +329,10 @@ IMPLEMENTACIONES: dict[str, Callable[..., Any]] = {
     "extraer_pdf_laboratorio": _extraer_pdf,
     "registrar_resultados": _registrar_resultados,
     "exportar_evaluacion": _exportar,
+    "listar_fotografias": _listar_fotografias,
+    "clasificar_fotografias": _clasificar_fotografias,
+    "actualizar_fotografia": _actualizar_fotografia,
+    "generar_seccion_fotografica": _seccion_fotografica,
     "crear_version": _crear_version,
     "consultar_bitacora": _consultar_bitacora,
 }

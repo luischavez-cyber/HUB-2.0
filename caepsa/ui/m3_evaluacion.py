@@ -65,12 +65,14 @@ if filtradas:
     if "Fracción ligera" in df.columns:
         estilos["Fracción ligera"] = [x + ";border:2px solid #9c0006" if "f8d7da" in x else x
                                       for x in estilos["Fracción ligera"]]
-    lmp = pd.DataFrame([["", "", "LMP", "", "", "", *[lmp_aplicable(c, usos) for c in params], ""]], columns=enc)
-    st.dataframe(pd.concat([lmp, df], ignore_index=True).style.apply(
-        lambda _: pd.concat([pd.DataFrame([[""] * len(enc)], columns=enc), estilos], ignore_index=True), axis=None)
-        .format({"X (UTM)": lambda v: f"{v:.2f}" if isinstance(v, float) else v,
-                 "Y (UTM)": lambda v: f"{v:.2f}" if isinstance(v, float) else v}),
-        hide_index=True, use_container_width=True, height=min(38 * (len(df) + 2), 900))
+    lmp = pd.DataFrame([["", "", "LMP", "", "", "", *[f"{lmp_aplicable(c, usos):g}" for c in params], ""]],
+                       columns=enc)
+    # Todo como texto: columnas homogéneas para la tabla (UTM sin separador de miles).
+    for col in ("X (UTM)", "Y (UTM)"):
+        df[col] = [f"{v:.2f}" if isinstance(v, (int, float)) else "" for v in df[col]]
+    st.dataframe(pd.concat([lmp, df], ignore_index=True).astype(str).style.apply(
+        lambda _: pd.concat([pd.DataFrame([[""] * len(enc)], columns=enc), estilos], ignore_index=True), axis=None),
+        hide_index=True, width="stretch", height=min(38 * (len(df) + 2), 900))
 else:
     st.caption("Ningún registro coincide con los filtros.")
 
@@ -81,7 +83,7 @@ with st.expander("Detalle por resultado (trazabilidad)"):
             "Estado": r.estado, "Método": r.datos.get("metodo"), "Página PDF": r.datos.get("pagina_pdf"),
             "Referencia": r.referencia, "Observaciones": "; ".join(r.observaciones)}
            for m in filtradas for r in m.resultados]
-    st.dataframe(pd.DataFrame(det), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(det), hide_index=True, width="stretch")
     faltantes = [(m.muestra, ", ".join(PARAMETROS[c].nombre for c in m.faltantes)) for m in filtradas if m.faltantes]
     if faltantes:
         st.warning("Parámetros exigidos por la Tabla 1 no reportados:\n\n" +

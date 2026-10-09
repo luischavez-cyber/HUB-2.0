@@ -22,7 +22,7 @@ Los datos se guardan en `./workspace` (cámbielo con `CAEPSA_WORKSPACE`). Prueba
 
 Agente conversacional (Claude, con uso de herramientas) que opera toda la plataforma: crea y actualiza proyectos,
 recibe el PDF del laboratorio en el chat, extrae y guarda resultados, evalúa contra la NOM-138, informa
-alertas y exporta tablas Excel/Word. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
+alertas, clasifica fotografías y exporta tablas Excel/Word y la sección fotográfica. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
 (`caepsa/asistente/herramientas.py`), que llaman al mismo motor determinista que usan las pantallas. Cada
 acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 
@@ -33,7 +33,7 @@ acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 | 1 | Gestión de Proyectos: espacio por proyecto (BD SQLite + carpeta de archivos), ficha, tablero de avance y alertas, versiones (instantáneas), bitácora antes/después | ✅ Etapa 1 |
 | 2 | Extracción de resultados de laboratorio (pdfplumber) + captura/corrección manual + importación CSV | ✅ Etapa 1 |
 | 3 | Evaluación NOM-138: LMP por uso de suelo (Tablas 2 y 3), parámetros por producto (Tabla 1), uso mixto = más estricto, tabla filtrable por zona/estado, exportación Excel y Word | ✅ Etapa 1 |
-| 4 | Gestión fotográfica (clasificación por etapa y pies de foto ≤ 15 palabras con Claude Vision) | Etapa 2 |
+| 4 | Gestión fotográfica: clasificación por etapa y pies técnicos ≤ 15 palabras con Claude Vision, EXIF (fecha, GPS→UTM) y asociación automática al punto de muestreo más cercano (≤ 30 m), reclasificación manual que la IA no sobrescribe, sección fotográfica en Word | ✅ Etapa 2 |
 | 5 | Revisión técnica ambiental (perspectiva SEMARNAT/ASEA, Índice de Calidad Técnica 0–100) | Etapa 3 |
 | 6 | Análisis de dispersión de hidrocarburos (Capítulo 5) | Etapa 4 |
 | 7 | Generación del informe completo en Word | Etapa 5 |
@@ -44,6 +44,15 @@ acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 - **No detectado**: reportado `<LD` con LD ≤ LMP.
 - **Indeterminado**: `<LD` con LD > LMP, o la muestra no reporta todos los parámetros que la Tabla 1 exige para el producto.
 - Uso de suelo mixto: se aplica el LMP menor. La cita "apartado 6.1.3" está marcada para cotejarse contra el texto del DOF.
+
+## Gestión fotográfica (Módulo 4)
+
+Categorías, en el orden del informe: reconocimiento del sitio, muestreo de suelo, excavaciones y sondeos,
+pozos de monitoreo, evidencias de laboratorio y cadena de custodia, cierre de actividades (y "otras evidencias").
+Los pies de foto siguen una guía de estilo fija: una oración sin punto final, que inicia con la actividad,
+describe solo lo observable y no afirma presencia ni concentración de contaminantes. Si la IA propone más de
+15 palabras se le pide que lo reduzca una vez; si persiste queda marcado para revisión. Las propuestas de la IA
+quedan como "pendientes de revisión" hasta que una persona las confirma.
 
 ## Pendientes de datos reales
 

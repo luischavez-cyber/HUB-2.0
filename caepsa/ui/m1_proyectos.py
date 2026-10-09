@@ -79,7 +79,7 @@ with tab_docs:
     docs = p.documentos()
     if docs:
         st.dataframe(pd.DataFrame(docs)[["tipo", "nombre", "cargado", "sha256"]], hide_index=True,
-                     use_container_width=True)
+                     width="stretch")
     else:
         st.caption("Sin documentos. El PDF de laboratorio se carga en el Módulo 2.")
 
@@ -99,6 +99,6 @@ with tab_versiones:
 with tab_bitacora:
     registros = p.bitacora()
     if registros:
-        st.dataframe(pd.DataFrame(registros), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(registros), hide_index=True, width="stretch")
     else:
         st.caption("Sin cambios registrados.")

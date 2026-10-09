@@ -7,11 +7,12 @@ import streamlit as st
 
 from caepsa.asistente.agente import Asistente, Evento
 from caepsa.asistente.herramientas import Contexto
+from caepsa.fotografia.registro import registrar_fotografia
 from caepsa.ui.comun import proyecto_activo, usuario
 
 st.title("Asistente CAEPSA")
 st.caption("Pídale lo que necesite: crear o actualizar el proyecto, extraer el PDF del laboratorio, "
-           "evaluar contra la NOM-138, revisar alertas o exportar tablas.")
+           "evaluar contra la NOM-138, clasificar fotografías, revisar alertas o exportar tablas.")
 
 if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
     st.warning("Configure la variable de entorno `ANTHROPIC_API_KEY` antes de iniciar la aplicación "
@@ -67,11 +68,13 @@ if entrada:
             st.error("Seleccione o cree un proyecto antes de adjuntar archivos.")
             st.stop()
         for f in entrada.files:
-            es_pdf = f.name.lower().endswith(".pdf")
-            tipo = "laboratorio" if es_pdf else "fotografia"
-            p.guardar_documento(tipo, f.name, f.getvalue())
-            doc_id = p.documentos(tipo)[0]["id"]
-            adjuntos.append(f"[Adjunto guardado en el proyecto: documento_id={doc_id}, '{f.name}', tipo={tipo}]")
+            if f.name.lower().endswith(".pdf"):
+                p.guardar_documento("laboratorio", f.name, f.getvalue())
+                doc_id = p.documentos("laboratorio")[0]["id"]
+                adjuntos.append(f"[PDF de laboratorio guardado: documento_id={doc_id}, '{f.name}']")
+            else:
+                foto_id = registrar_fotografia(p, f.name, f.getvalue())
+                adjuntos.append(f"[Fotografía registrada: id={foto_id}, '{f.name}']")
         texto = "\n".join(adjuntos + [texto or "Procese el archivo adjunto."])
     st.session_state["chat"].append({"rol": "user", "texto": texto})
     with st.chat_message("user"):

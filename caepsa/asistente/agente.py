@@ -19,8 +19,9 @@ contaminados por derrames de hidrocarburos en México, tomando como referencia e
 Caracterización de Nueva Italia, Michoacán (Km 176+500, Autopista Siglo XXI).
 
 Tienes herramientas que operan la plataforma: gestión de proyectos (ficha, tablero, versiones, bitácora), \
-extracción de resultados de laboratorio desde PDF, captura manual y evaluación normativa. Úsalas para \
-consultar y modificar datos en lugar de pedir al usuario que navegue por la interfaz.
+extracción de resultados de laboratorio desde PDF, captura manual, evaluación normativa y gestión fotográfica \
+(clasificación por etapa, pies de foto y sección fotográfica del informe). Úsalas para consultar y modificar \
+datos en lugar de pedir al usuario que navegue por la interfaz.
 
 Reglas que no se negocian:
 - El marco regulatorio es exclusivamente la {NORMA} (DOF {PUBLICACION_DOF}). No cites ni apliques otras \
@@ -34,11 +35,13 @@ o que provengan del documento oficial.
 - Antes de modificar la ficha o registrar resultados, resume lo que vas a guardar. Tras cambios importantes \
 ofrece crear una versión.
 - Si una referencia aparece marcada para cotejar contra el DOF, menciónalo.
+- Las clasificaciones y pies de foto de la IA son propuestas: preséntalas para revisión y marca una foto como \
+revisada solo cuando el usuario lo confirme.
 
 Estilo: español técnico, preciso y breve. Usa tablas Markdown para resultados. Cuando haya excedencias, \
-nómbralas con muestra, punto, zona, valor y LMP. Los módulos de gestión fotográfica, revisión técnica, \
-análisis de dispersión y generación del informe completo están en desarrollo: si te los piden, explica qué \
-puedes adelantar con los datos disponibles."""
+nómbralas con muestra, punto, zona, valor y LMP. Los módulos de revisión técnica, análisis de dispersión y \
+generación del informe completo están en desarrollo: si te los piden, explica qué puedes adelantar con los \
+datos disponibles."""
 
 # Las entradas se validan al ejecutar (argumentos inesperados -> tool_result con is_error).
 HERRAMIENTAS = DEFINICIONES
@@ -56,6 +59,7 @@ class Asistente:
     def __init__(self, ctx: Contexto, cliente: Any | None = None):
         self.ctx = ctx
         self.cliente = cliente or anthropic.Anthropic()
+        ctx.cliente = ctx.cliente or self.cliente
         self.mensajes: list[dict[str, Any]] = []
 
     def _contexto_turno(self) -> str:

@@ -36,7 +36,7 @@ with tab_pdf:
             } for m in ext.muestras])
             st.dataframe(resumen.style.map(lambda v: "background-color:#fff3cd" if v else "",
                                            subset=["Campos por capturar"]),
-                         hide_index=True, use_container_width=True)
+                         hide_index=True, width="stretch")
             if ext.metodos:
                 st.caption("Métodos analíticos detectados: " +
                            "; ".join(f"{PARAMETROS[k].nombre}: {v}" for k, v in ext.metodos.items()))
@@ -58,7 +58,7 @@ with tab_datos:
     df["menor_que"] = df["menor_que"].fillna(0).astype(bool)
     zonas = p.zonas()
     editado = st.data_editor(
-        df[list(COLUMNAS_PLANTILLA)], num_rows="dynamic", use_container_width=True, hide_index=True,
+        df[list(COLUMNAS_PLANTILLA)], num_rows="dynamic", width="stretch", hide_index=True,
         column_config={
             "zona": st.column_config.SelectboxColumn("zona", options=zonas),
             "parametro": st.column_config.SelectboxColumn("parametro", options=list(PARAMETROS)),

@@ -111,7 +111,7 @@ class Proyecto:
         reg.commit()
 
     # ------------------------------------------------------------------ bitácora
-    def _bitacora(self, entidad: str, referencia: str, accion: str, antes: Any, despues: Any) -> None:
+    def registrar_cambio(self, entidad: str, referencia: str, accion: str, antes: Any, despues: Any) -> None:
         self.con.execute(
             "INSERT INTO bitacora (usuario, entidad, referencia, accion, antes, despues) VALUES (?,?,?,?,?,?)",
             (
@@ -150,7 +150,7 @@ class Proyecto:
                     "ON CONFLICT(campo) DO UPDATE SET valor=excluded.valor",
                     (campo, json.dumps(valor, ensure_ascii=False)),
                 )
-                self._bitacora("ficha", campo, "actualizar", actual.get(campo), valor)
+                self.registrar_cambio("ficha", campo, "actualizar", actual.get(campo), valor)
         self._tocar()
 
     def usos_suelo(self) -> list[UsoSuelo]:
@@ -171,7 +171,7 @@ class Proyecto:
                 "INSERT INTO documentos (tipo, nombre, ruta, sha256) VALUES (?,?,?,?)",
                 (tipo, nombre, str(destino), sha),
             )
-            self._bitacora("documento", nombre, "cargar", None, {"tipo": tipo, "sha256": sha})
+            self.registrar_cambio("documento", nombre, "cargar", None, {"tipo": tipo, "sha256": sha})
         self._tocar()
         return destino
 
@@ -192,14 +192,14 @@ class Proyecto:
                 if nuevos:
                     sets = ", ".join(f"{k}=?" for k in nuevos)
                     self.con.execute(f"UPDATE puntos SET {sets} WHERE id=?", (*nuevos.values(), previo["id"]))
-                    self._bitacora("punto", clave, "actualizar", {k: previo[k] for k in nuevos}, nuevos)
+                    self.registrar_cambio("punto", clave, "actualizar", {k: previo[k] for k in nuevos}, nuevos)
                 return int(previo["id"])
             cur = self.con.execute(
                 "INSERT INTO puntos (clave, zona, utm_x, utm_y, utm_zona, descripcion) VALUES (?,?,?,?,?,?)",
                 (clave, campos.get("zona"), campos.get("utm_x"), campos.get("utm_y"),
                  campos.get("utm_zona"), campos.get("descripcion")),
             )
-            self._bitacora("punto", clave, "crear", None, campos)
+            self.registrar_cambio("punto", clave, "crear", None, campos)
             return int(cur.lastrowid or 0)
 
     def guardar_muestra(self, clave: str, punto: str | None, **datos: Any) -> int:
@@ -215,14 +215,14 @@ class Proyecto:
                 if nuevos:
                     sets = ", ".join(f"{k}=?" for k in nuevos)
                     self.con.execute(f"UPDATE muestras SET {sets} WHERE id=?", (*nuevos.values(), previo["id"]))
-                    self._bitacora("muestra", clave, "actualizar", {k: previo[k] for k in nuevos}, nuevos)
+                    self.registrar_cambio("muestra", clave, "actualizar", {k: previo[k] for k in nuevos}, nuevos)
                 return int(previo["id"])
             cols = ["clave", *campos]
             cur = self.con.execute(
                 f"INSERT INTO muestras ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
                 (clave, *campos.values()),
             )
-            self._bitacora("muestra", clave, "crear", None, campos)
+            self.registrar_cambio("muestra", clave, "crear", None, campos)
             return int(cur.lastrowid or 0)
 
     def guardar_resultado(self, muestra: str, parametro: str, valor: float | None, *,
@@ -249,7 +249,7 @@ class Proyecto:
                 " pagina_pdf=excluded.pagina_pdf",
                 (fila["id"], parametro, *nuevo.values()),
             )
-            self._bitacora("resultado", f"{muestra}/{parametro}", "actualizar" if previo else "crear",
+            self.registrar_cambio("resultado", f"{muestra}/{parametro}", "actualizar" if previo else "crear",
                            dict(previo) if previo else None, nuevo)
         self._tocar()
 
@@ -259,7 +259,7 @@ class Proyecto:
             return
         with self.con:
             self.con.execute("DELETE FROM muestras WHERE id=?", (previo["id"],))
-            self._bitacora("muestra", clave, "eliminar", dict(previo), None)
+            self.registrar_cambio("muestra", clave, "eliminar", dict(previo), None)
         self._tocar()
 
     def tabla_resultados(self) -> list[dict[str, Any]]:
@@ -292,7 +292,7 @@ class Proyecto:
         with sqlite3.connect(destino) as copia:
             self.con.backup(copia)
         with self.con:
-            self._bitacora("version", destino.name, "instantanea", None, {"etiqueta": etiqueta})
+            self.registrar_cambio("version", destino.name, "instantanea", None, {"etiqueta": etiqueta})
         return destino
 
     def versiones(self) -> list[Path]:
@@ -303,7 +303,7 @@ class Proyecto:
         with sqlite3.connect(archivo) as origen:
             origen.backup(self.con)
         with self.con:
-            self._bitacora("version", archivo.name, "restaurar", None, {"archivo": archivo.name})
+            self.registrar_cambio("version", archivo.name, "restaurar", None, {"archivo": archivo.name})
 
     def cerrar(self) -> None:
         self.con.close()

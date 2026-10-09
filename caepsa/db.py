@@ -60,6 +60,26 @@ CREATE TABLE IF NOT EXISTS documentos (
     sha256  TEXT NOT NULL,
     cargado TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
+CREATE TABLE IF NOT EXISTS fotografias (
+    id                INTEGER PRIMARY KEY,
+    documento_id      INTEGER NOT NULL UNIQUE REFERENCES documentos(id) ON DELETE CASCADE,
+    categoria         TEXT,
+    categoria_origen  TEXT,
+    pie               TEXT,
+    pie_origen        TEXT,
+    confianza         TEXT,
+    observacion       TEXT,
+    punto             TEXT,
+    punto_origen      TEXT,
+    fecha_toma        TEXT,
+    lat               REAL,
+    lon               REAL,
+    utm_x             REAL,
+    utm_y             REAL,
+    orden             INTEGER,
+    revisada          INTEGER NOT NULL DEFAULT 0,
+    incluir           INTEGER NOT NULL DEFAULT 1
+);
 CREATE TABLE IF NOT EXISTS bitacora (
     id        INTEGER PRIMARY KEY,
     fecha     TEXT NOT NULL DEFAULT (datetime('now','localtime')),

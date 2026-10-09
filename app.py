@@ -27,5 +27,6 @@ paginas = st.navigation([
     st.Page("caepsa/ui/m1_proyectos.py", title="1 · Gestión de Proyectos", icon="📁"),
     st.Page("caepsa/ui/m2_laboratorio.py", title="2 · Resultados de Laboratorio", icon="🧾"),
     st.Page("caepsa/ui/m3_evaluacion.py", title="3 · Evaluación NOM-138", icon="⚖️"),
+    st.Page("caepsa/ui/m4_fotografias.py", title="4 · Gestión Fotográfica", icon="📷"),
 ])
 paginas.run()
