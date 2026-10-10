@@ -110,6 +110,24 @@ CREATE TABLE IF NOT EXISTS hallazgos (
     estado                TEXT NOT NULL DEFAULT 'abierto',
     nota                  TEXT
 );
+CREATE TABLE IF NOT EXISTS medio_fisico (
+    campo       TEXT PRIMARY KEY,
+    valor       TEXT,
+    fuente      TEXT,
+    observacion TEXT,
+    actualizado TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS analisis_dispersion (
+    id                  INTEGER PRIMARY KEY,
+    fecha               TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    usuario             TEXT,
+    metricas            TEXT NOT NULL,
+    capitulo            TEXT NOT NULL,
+    usa_ia              INTEGER NOT NULL DEFAULT 0,
+    modelo              TEXT,
+    aviso               TEXT,
+    cifras_no_respaldadas TEXT
+);
 CREATE TABLE IF NOT EXISTS bitacora (
     id        INTEGER PRIMARY KEY,
     fecha     TEXT NOT NULL DEFAULT (datetime('now','localtime')),

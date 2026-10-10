@@ -29,7 +29,7 @@ def test_herramientas_cubren_flujo_completo():
     assert ejecutar(ctx, "consultar_norma", {"parametro": "Plomo"})[1]  # no normado en NOM-138
     assert ejecutar(ctx, "inexistente", {})[1]
     assert ejecutar(ctx, "consultar_ficha", {"campo_raro": 1})[1]  # argumentos inválidos -> error controlado
-    assert len(DEFINICIONES) == 24
+    assert len(DEFINICIONES) == 28
 
 
 class ClienteFalso:

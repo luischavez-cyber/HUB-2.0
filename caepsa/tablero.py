@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .dispersion import capitulo as capitulo5
+from .dispersion import medio_fisico as mf
+from .dispersion.analisis import analizar as analizar_dispersion
 from .fotografia.clasificador import CATEGORIAS
 from .fotografia.registro import diagnostico
 from .normativa.evaluacion import EXCEDE, INDETERMINADO, evaluar
@@ -19,7 +22,7 @@ MODULOS = (
     (6, "Análisis de Dispersión"),
     (7, "Generación de Informes"),
 )
-DISPONIBLES = {1, 2, 3, 4, 5}
+DISPONIBLES = {1, 2, 3, 4, 5, 6}
 
 
 @dataclass
@@ -126,6 +129,25 @@ def estado(p: Proyecto) -> tuple[dict[int, float], list[Alerta]]:
                                               f"(ICT {ultima['ict_vigente']:.0f})"))
     elif p.documentos("borrador"):
         alertas.append(Alerta("media", 5, "Hay borradores cargados sin revisión técnica"))
+
+    # Módulo 6
+    datos_mf = mf.leer(p)
+    requeridos_mf = [c for c in mf.CAMPOS if c.requerido]
+    completos = sum(1 for c in requeridos_mf if mf.valor(datos_mf, c.clave) is not None)
+    capitulos = capitulo5.listar(p)
+    avance[6] = 0.6 * completos / len(requeridos_mf) + (0.4 if capitulos else 0.0)
+    if completos < len(requeridos_mf):
+        alertas.append(Alerta("media", 6, f"Medio físico: {len(requeridos_mf) - completos} dato(s) requerido(s) "
+                                          "sin valor o sin fuente documentada"))
+    if conteo["resultados"] and usos:
+        a = analizar_dispersion(p)
+        for eje in ("horizontal", "vertical"):
+            d = a.get("delimitacion", {}).get(eje)
+            if d and not d["cerrada"] and a["espacial"]["puntos_con_excedencia"]:
+                alertas.append(Alerta("alta", 6, f"Delimitación {eje} abierta: {d['motivo']}"))
+    if capitulos and capitulos[0]["cifras_no_respaldadas"]:
+        alertas.append(Alerta("media", 6, f"Capítulo 5: {len(capitulos[0]['cifras_no_respaldadas'])} cifra(s) sin "
+                                          "respaldo en los datos, resaltadas para revisión"))
 
     for n, nombre in MODULOS:
         if n not in DISPONIBLES:

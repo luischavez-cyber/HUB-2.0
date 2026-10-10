@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from ..dispersion import capitulo as capitulo5
+from ..dispersion import medio_fisico as mf
+from ..dispersion.analisis import analizar as analizar_dispersion
 from ..exportacion.tablas import a_excel, a_word
 from ..fotografia.clasificador import CATEGORIAS, MAX_PALABRAS, contar_palabras
 from ..fotografia.registro import actualizar_fotografia, clasificar_fotografias, listar_fotografias
@@ -152,6 +155,29 @@ DEFINICIONES: list[dict[str, Any]] = [
      "description": "Genera el dictamen de revisión técnica en Word o la matriz de hallazgos en Excel.",
      "input_schema": _obj({"revision_id": {"type": "integer"},
                            "formato": {"type": "string", "enum": ["word", "excel"]}}, ["formato"])},
+    {"name": "consultar_medio_fisico",
+     "description": "Datos del medio físico del sitio (topografía, suelo, geología, hidrología, vegetación, clima, "
+                    "evento) con su fuente, y los datos requeridos faltantes o sin fuente.",
+     "input_schema": _obj({})},
+    {"name": "actualizar_medio_fisico",
+     "description": "Registra datos del medio físico. Cada dato exige su fuente documental (levantamiento de campo, "
+                    "carta temática, estación climatológica, informe…). Solo datos y fuentes que dé el usuario o que "
+                    "consten en un documento del proyecto; nunca estimados.",
+     "input_schema": _obj({"datos": {"type": "object", "additionalProperties": False, "properties": {
+         c.clave: {"type": "object", "additionalProperties": False, "required": ["valor", "fuente"],
+                   "description": c.etiqueta + (f" ({c.unidad})" if c.unidad else "")
+                   + (f"; opciones: {', '.join(c.opciones)}" if c.opciones else ""),
+                   "properties": {"valor": {"type": ["string", "number"]}, "fuente": _S, "observacion": _S}}
+         for c in mf.CAMPOS}}}, ["datos"])},
+    {"name": "analizar_dispersion",
+     "description": "Análisis determinista de la dispersión: distribución espacial y vertical de la afectación, "
+                    "dirección respecto a la pendiente, área y volumen preliminar, delimitación, matriz de "
+                    "susceptibilidad, receptores e información faltante.",
+     "input_schema": _obj({})},
+    {"name": "generar_capitulo5",
+     "description": "Genera el Capítulo 5 (Análisis de dispersión de hidrocarburos) en Word con tablas y figura. "
+                    "Con usar_ia=true lo redacta con IA y marca las cifras sin respaldo en los datos.",
+     "input_schema": _obj({"usar_ia": {"type": "boolean"}})},
     {"name": "consultar_bitacora", "description": "Últimos cambios registrados (quién, cuándo, antes/después).",
      "input_schema": _obj({"limite": {"type": "integer"}})},
 ]
@@ -396,6 +422,40 @@ def _exportar_revision(ctx: Contexto, formato: str, revision_id: int | None = No
     return {"archivo": destino.name}
 
 
+def _consultar_medio_fisico(ctx: Contexto) -> Any:
+    datos = mf.leer(ctx.abrir())
+    falt = mf.faltantes(datos)
+    return {"datos": {k: {"grupo": mf.POR_CLAVE[k].grupo, "etiqueta": mf.POR_CLAVE[k].etiqueta, "valor": d["valor"],
+                          "unidad": mf.POR_CLAVE[k].unidad, "fuente": d["fuente"]}
+                      for k, d in datos.items() if k in mf.POR_CLAVE},
+            "requeridos_sin_valor": [c.etiqueta for c in falt["sin_valor"]],
+            "sin_fuente_no_utilizables": [c.etiqueta for c in falt["sin_fuente"]]}
+
+
+def _actualizar_medio_fisico(ctx: Contexto, datos: dict[str, dict[str, Any]]) -> Any:
+    sin_fuente = [k for k, d in datos.items() if not str(d.get("fuente") or "").strip()]
+    if sin_fuente:
+        raise ErrorHerramienta(f"Falta la fuente de: {', '.join(sin_fuente)}. Pídala al usuario.")
+    return {"actualizados": mf.guardar(ctx.abrir(), datos)}
+
+
+def _analizar_dispersion(ctx: Contexto) -> Any:
+    return capitulo5.hechos(analizar_dispersion(ctx.abrir()))
+
+
+def _generar_capitulo5(ctx: Contexto, usar_ia: bool = True) -> Any:
+    p = ctx.abrir()
+    aid = capitulo5.generar(p, usar_ia=usar_ia, cliente=ctx.cliente if usar_ia else None)
+    r = capitulo5.obtener(p, aid)
+    destino = p.ruta / "archivos" / "exportaciones" / f"{p.clave}_capitulo5_v{aid}.docx"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_bytes(capitulo5.a_word(p, aid))
+    ctx.archivos_generados.append(destino)
+    return {"analisis_id": aid, "archivo": destino.name, "redactado_con_ia": bool(r["usa_ia"]), "aviso": r["aviso"],
+            "cifras_no_respaldadas": r["cifras_no_respaldadas"],
+            "pendientes": r["metricas"].get("pendientes", [])}
+
+
 def _crear_version(ctx: Contexto, etiqueta: str) -> Any:
     return {"version": ctx.abrir().crear_instantanea(etiqueta).name}
 
@@ -427,6 +487,10 @@ IMPLEMENTACIONES: dict[str, Callable[..., Any]] = {
     "consultar_revision": _consultar_revision,
     "actualizar_hallazgo": _actualizar_hallazgo,
     "exportar_revision": _exportar_revision,
+    "consultar_medio_fisico": _consultar_medio_fisico,
+    "actualizar_medio_fisico": _actualizar_medio_fisico,
+    "analizar_dispersion": _analizar_dispersion,
+    "generar_capitulo5": _generar_capitulo5,
     "crear_version": _crear_version,
     "consultar_bitacora": _consultar_bitacora,
 }
