@@ -7,7 +7,7 @@ autoridad.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable
+from typing import Any
 
 CRITICIDADES = {"critica": 20.0, "alta": 10.0, "media": 5.0, "baja": 2.0, "info": 0.0}
 ETIQUETA_CRITICIDAD = {"critica": "Crítica", "alta": "Alta", "media": "Media", "baja": "Baja", "info": "Informativa"}
@@ -75,7 +75,7 @@ class Hallazgo:
         return asdict(self)
 
 
-def calcular_ict(hallazgos: Iterable[Hallazgo]) -> dict[str, Any]:
+def calcular_ict(hallazgos: list[Hallazgo]) -> dict[str, Any]:
     """ICT y subíndices. Los hallazgos descartados no penalizan; los atendidos sí (hasta una nueva revisión)."""
     penal = {d: 0.0 for d in DIMENSIONES}
     for h in hallazgos:
@@ -83,11 +83,15 @@ def calcular_ict(hallazgos: Iterable[Hallazgo]) -> dict[str, Any]:
             penal[h.dimension] += h.penalizacion
     sub = {d: max(0.0, 100.0 - p) for d, p in penal.items()}
     ict = sum(sub[d] * DIMENSIONES[d][1] for d in DIMENSIONES)
+    criticos = sum(1 for h in hallazgos if h.criticidad == "critica" and h.estado == "abierto")
     return {"ict": round(ict, 1), "subindices": {d: round(v, 1) for d, v in sub.items()},
-            "interpretacion": interpretar(ict)}
+            "interpretacion": interpretar(ict, criticos), "criticos_abiertos": criticos}
 
 
-def interpretar(ict: float) -> str:
+def interpretar(ict: float, criticos_abiertos: int = 0) -> str:
+    """Un informe con hallazgos críticos abiertos nunca se califica como apto, aunque su puntaje sea alto."""
+    if criticos_abiertos and ict >= 50:
+        return f"Requiere correcciones: {criticos_abiertos} hallazgo(s) crítico(s) abiertos"
     if ict >= 85:
         return "Apto para ingreso a la autoridad"
     if ict >= 70:

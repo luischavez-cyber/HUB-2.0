@@ -22,7 +22,7 @@ Los datos se guardan en `./workspace` (cámbielo con `CAEPSA_WORKSPACE`). Prueba
 
 Agente conversacional (Claude, con uso de herramientas) que opera toda la plataforma: crea y actualiza proyectos,
 recibe el PDF del laboratorio en el chat, extrae y guarda resultados, evalúa contra la NOM-138, informa
-alertas, clasifica fotografías, revisa el borrador del informe, genera el Capítulo 5 de dispersión y exporta tablas Excel/Word y la sección fotográfica. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
+alertas, clasifica fotografías, revisa el borrador del informe, genera el Capítulo 5 de dispersión, genera el informe completo y exporta tablas Excel/Word y la sección fotográfica. El modelo **no calcula LMP de memoria**: los obtiene de las herramientas
 (`caepsa/asistente/herramientas.py`), que llaman al mismo motor determinista que usan las pantallas. Cada
 acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 
@@ -36,7 +36,7 @@ acción del agente se muestra en el chat y queda en la bitácora del proyecto.
 | 4 | Gestión fotográfica: clasificación por etapa y pies técnicos ≤ 15 palabras con Claude Vision, EXIF (fecha, GPS→UTM) y asociación automática al punto de muestreo más cercano (≤ 30 m), reclasificación manual que la IA no sobrescribe, sección fotográfica en Word | ✅ Etapa 2 |
 | 5 | Revisión técnica ambiental: verificaciones automáticas contra la base del proyecto y la NOM-138 + revisión completa con IA desde la perspectiva SEMARNAT/ASEA, hallazgos con criticidad, riesgo y recomendación, Índice de Calidad Técnica 0–100, historial por versión del borrador, dictamen Word y matriz Excel | ✅ Etapa 3 |
 | 6 | Análisis de dispersión: datos del medio físico con fuente obligatoria, distribución espacial y vertical de la afectación, delimitación, área y volumen preliminar, matriz de susceptibilidad, receptores, Figura 5.1 y Capítulo 5 en Word (plantilla o redacción con IA con verificación de cifras) | ✅ Etapa 4 |
-| 7 | Generación del informe completo en Word | Etapa 5 |
+| 7 | Generación del Informe de Caracterización en Word: portada, índice, capítulos 1–10 y anexos con los datos de todos los módulos, plantilla institucional opcional, marcadores [COMPLETAR] para lo no sustentado y revisión técnica automática del informe generado | ✅ Etapa 5 |
 
 ## Criterios de evaluación (Módulo 3)
 
@@ -73,6 +73,8 @@ El borrador (.docx o .pdf) se revisa en dos capas:
 media 5, baja 2, informativa 0) por dimensión: consistencia de datos 35 %, sustento normativo 30 %, completitud
 20 %, claridad 15 %. ≥ 85 apto para ingreso; 70–84 ajustes menores; 50–69 correcciones importantes; < 50 no apto.
 Un hallazgo solo se descarta con justificación (queda en bitácora); el «ICT vigente» excluye los descartados.
+Con hallazgos críticos abiertos el dictamen nunca es «apto», aunque el puntaje sea alto. Los marcadores
+`[COMPLETAR…]`/`[DATO PENDIENTE…]` generan un hallazgo crítico (más uno por sección afectada).
 
 ## Análisis de dispersión (Módulo 6)
 
@@ -88,6 +90,23 @@ Un hallazgo solo se descarta con justificación (queda en bitácora); el «ICT v
   `caepsa/dispersion/analisis.py`); no es un criterio normativo ni sustituye una modelación numérica.
 - **Capítulo 5** (secciones 5.1–5.8, Tablas 5.1–5.3 y Figura 5.1). Sin IA se redacta por plantilla; con IA, toda
   cifra del texto que no exista en los datos se resalta en amarillo en el Word para su verificación.
+
+## Informe de Caracterización (Módulo 7)
+
+Estructura: portada, índice, 1 Antecedentes, 2 Marco legal (solo NOM-138; otras disposiciones quedan para el
+responsable técnico), 3 Metodología de muestreo, 4 Resultados y evaluación normativa (tabla NOM-138 en página
+horizontal), 5 Análisis de dispersión (Módulo 6), 6 Identificación de la pluma, 7 Evaluación de daños,
+8 Conclusiones, 9 Plan de saneamiento (metas de limpieza = LMP aplicables; técnica, muestreo de comprobación y
+programa quedan por completar), 10 Memoria fotográfica (Módulo 4) y anexos.
+
+- Todo dato proviene de la base del proyecto; lo que no se puede sustentar se inserta como `[COMPLETAR: …]`
+  resaltado en amarillo y se cuenta.
+- **Plantilla institucional** (.docx): se conservan estilos, encabezado, pie y logotipo; se crean los estilos que
+  falten.
+- El índice y la paginación son campos de Word: se actualizan al abrir el archivo.
+- El informe se guarda como borrador del proyecto y puede pasar automáticamente por la revisión técnica del
+  Módulo 5. Las pruebas exigen que el informe generado no tenga **ninguna** inconsistencia de datos, normativa o
+  estructura según ese revisor.
 
 ## Pendientes de datos reales
 

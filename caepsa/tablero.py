@@ -1,7 +1,9 @@
 """Tablero del proyecto: avance por módulo y alertas pendientes."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 
 from .dispersion import capitulo as capitulo5
 from .dispersion import medio_fisico as mf
@@ -22,7 +24,7 @@ MODULOS = (
     (6, "Análisis de Dispersión"),
     (7, "Generación de Informes"),
 )
-DISPONIBLES = {1, 2, 3, 4, 5, 6}
+DISPONIBLES = {1, 2, 3, 4, 5, 6, 7}
 
 
 @dataclass
@@ -149,7 +151,27 @@ def estado(p: Proyecto) -> tuple[dict[int, float], list[Alerta]]:
         alertas.append(Alerta("media", 6, f"Capítulo 5: {len(capitulos[0]['cifras_no_respaldadas'])} cifra(s) sin "
                                           "respaldo en los datos, resaltadas para revisión"))
 
+    # Módulo 7
+    ultimo = ultimo_informe(p)
+    if ultimo:
+        revs = [r for r in listar_revisiones(p) if r["documento_id"] == ultimo["documento_id"]]
+        avance[7] = revs[0]["ict_vigente"] / 100 if revs else 0.5
+        if ultimo["pendientes"]:
+            alertas.append(Alerta("media", 7, f"{ultimo['nombre']}: {ultimo['pendientes']} dato(s) por completar"))
+    elif conteo["resultados"]:
+        alertas.append(Alerta("info", 7, "Informe de Caracterización aún no generado"))
+
     for n, nombre in MODULOS:
         if n not in DISPONIBLES:
             alertas.append(Alerta("info", n, f"{nombre}: módulo programado para una etapa posterior"))
     return avance, alertas
+
+
+def ultimo_informe(p: Proyecto) -> dict[str, Any] | None:
+    """Último informe generado (Módulo 7), según la bitácora."""
+    f = p.con.execute("SELECT referencia, despues FROM bitacora WHERE entidad='informe' AND accion='generar' "
+                      "ORDER BY id DESC LIMIT 1").fetchone()
+    if not f:
+        return None
+    d = json.loads(f["despues"])
+    return {"nombre": f["referencia"], "documento_id": d["documento_id"], "pendientes": d["pendientes"]}

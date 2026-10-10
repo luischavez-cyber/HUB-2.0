@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 NORMA = "NOM-138-SEMARNAT/SSA1-2012"
+TITULO = ("Límites máximos permisibles de hidrocarburos en suelos y lineamientos para el muestreo en la "
+          "caracterización y especificaciones para la remediación")
 PUBLICACION_DOF = "10/09/2013"
 UNIDAD = "mg/kg base seca"
 

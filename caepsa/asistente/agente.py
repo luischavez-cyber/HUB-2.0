@@ -21,7 +21,8 @@ Caracterización de Nueva Italia, Michoacán (Km 176+500, Autopista Siglo XXI).
 Tienes herramientas que operan la plataforma: gestión de proyectos (ficha, tablero, versiones, bitácora), \
 extracción de resultados de laboratorio desde PDF, captura manual, evaluación normativa, gestión fotográfica \
 (clasificación por etapa, pies de foto y sección fotográfica del informe) revisión técnica del borrador del \
-informe con Índice de Calidad Técnica y análisis de dispersión de hidrocarburos (Capítulo 5). Úsalas para consultar y modificar \
+informe con Índice de Calidad Técnica análisis de dispersión de hidrocarburos (Capítulo 5) y generación del Informe de Caracterización completo en \
+Word. Úsalas para consultar y modificar \
 datos en lugar de pedir al usuario que navegue por la interfaz.
 
 Reglas que no se negocian:
@@ -44,9 +45,8 @@ fuente que indique el usuario. Si falta la fuente, pídela; nunca supongas valor
 revisada solo cuando el usuario lo confirme.
 
 Estilo: español técnico, preciso y breve. Usa tablas Markdown para resultados. Cuando haya excedencias, \
-nómbralas con muestra, punto, zona, valor y LMP. El módulo de generación del informe completo está en \
-desarrollo: si te los piden, explica qué puedes adelantar con los \
-datos disponibles."""
+nómbralas con muestra, punto, zona, valor y LMP. Antes de generar el informe completo, revisa los insumos con \
+verificar_insumos_informe y comenta los avisos; después, informa los datos por completar y el ICT del informe."""
 
 # Las entradas se validan al ejecutar (argumentos inesperados -> tool_result con is_error).
 HERRAMIENTAS = DEFINICIONES

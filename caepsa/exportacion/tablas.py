@@ -124,21 +124,13 @@ def a_excel(muestras: list[MuestraEvaluada], usos: list[UsoSuelo], ficha: dict[s
     return buf.getvalue()
 
 
-def a_word(muestras: list[MuestraEvaluada], usos: list[UsoSuelo], ficha: dict[str, Any],
-           numero_tabla: str = "4.1") -> bytes:
-    from docx import Document
-    from docx.enum.section import WD_ORIENT
+def escribir_tabla_nom138(doc: Any, muestras: list[MuestraEvaluada], usos: list[UsoSuelo], ficha: dict[str, Any],
+                          numero_tabla: str = "4.1") -> None:
+    """Escribe la tabla de cumplimiento (título, tabla y notas) en un documento existente."""
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
-    from docx.shared import Cm, Pt, RGBColor
-
-    doc = Document()
-    sec = doc.sections[0]
-    sec.orientation = WD_ORIENT.LANDSCAPE
-    sec.page_width, sec.page_height = sec.page_height, sec.page_width
-    for lado in ("left_margin", "right_margin"):
-        setattr(sec, lado, Cm(1.5))
+    from docx.shared import Pt, RGBColor
 
     enc, filas, estados = matriz(muestras)
     params = parametros_presentes(muestras)
@@ -197,6 +189,20 @@ def a_word(muestras: list[MuestraEvaluada], usos: list[UsoSuelo], ficha: dict[st
         p = doc.add_paragraph(n)
         p.runs[0].font.size = Pt(8)
 
+
+def a_word(muestras: list[MuestraEvaluada], usos: list[UsoSuelo], ficha: dict[str, Any],
+           numero_tabla: str = "4.1") -> bytes:
+    from docx import Document
+    from docx.enum.section import WD_ORIENT
+    from docx.shared import Cm
+
+    doc = Document()
+    sec = doc.sections[0]
+    sec.orientation = WD_ORIENT.LANDSCAPE
+    sec.page_width, sec.page_height = sec.page_height, sec.page_width
+    for lado in ("left_margin", "right_margin"):
+        setattr(sec, lado, Cm(1.5))
+    escribir_tabla_nom138(doc, muestras, usos, ficha, numero_tabla)
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()

@@ -47,6 +47,7 @@ CAMPOS_FICHA: tuple[Campo, ...] = (
     Campo("expediente", "Número de expediente"),
     Campo("fecha_evento", "Fecha del evento", requerido=False),
     Campo("laboratorio", "Laboratorio acreditado", requerido=False),
+    Campo("acreditacion_laboratorio", "Acreditación del laboratorio (organismo y número)", requerido=False),
     Campo("utm_zona", "Zona UTM del sitio", requerido=False),
     Campo("zonas", "Zonas de muestreo (separadas por coma)", requerido=False),
     Campo("puntos_esperados", "Puntos de muestreo esperados", requerido=False),

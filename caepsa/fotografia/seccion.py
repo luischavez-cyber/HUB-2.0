@@ -25,28 +25,26 @@ def fotos_para_informe(p: Proyecto) -> tuple[list[dict[str, Any]], list[str]]:
     return listas, avisos
 
 
-def generar_word(p: Proyecto, titulo: str = "Memoria fotográfica", columnas: int = 2) -> tuple[bytes, list[str]]:
-    from docx import Document
+def escribir_seccion(doc: Any, p: Proyecto, titulo: str = "Memoria fotográfica", columnas: int = 2,
+                     capitulo: str | None = None) -> tuple[list[str], int]:
+    """Escribe la sección fotográfica en un documento existente. Devuelve (avisos, fotografías incluidas).
+
+    Con ``capitulo`` (p. ej. "10") los subtítulos se numeran 10.1, 10.2…, como en el informe completo.
+    """
     from docx.enum.table import WD_TABLE_ALIGNMENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import Cm, Pt
 
     fotos, avisos = fotos_para_informe(p)
-    doc = Document()
-    for lado in ("left_margin", "right_margin"):
-        setattr(doc.sections[0], lado, Cm(2))
-    doc.add_heading(titulo, level=1)
-    ficha = p.ficha()
-    if ficha.get("nombre"):
-        doc.add_paragraph(ficha["nombre"]).runs[0].italic = True
-
-    numero = 0
+    doc.add_heading(f"{capitulo}. {titulo.upper()}" if capitulo else titulo, level=1)
+    numero, sub = 0, 0
     ancho = Cm(16.5 / columnas - 0.5)
     for clave, (nombre_cat, _) in CATEGORIAS.items():
         grupo = [f for f in fotos if f["categoria"] == clave]
         if not grupo:
             continue
-        doc.add_heading(nombre_cat, level=2)
+        sub += 1
+        doc.add_heading(f"{capitulo}.{sub} {nombre_cat}" if capitulo else nombre_cat, level=2)
         tabla = doc.add_table(rows=0, cols=columnas)
         tabla.alignment = WD_TABLE_ALIGNMENT.CENTER
         for i in range(0, len(grupo), columnas):
@@ -65,9 +63,19 @@ def generar_word(p: Proyecto, titulo: str = "Memoria fotográfica", columnas: in
                 r1.font.size = Pt(9)
                 pie.add_run(f["pie"]).font.size = Pt(9)
         doc.add_paragraph()
-
     if not numero:
         doc.add_paragraph("No hay fotografías clasificadas para incluir.")
+    return avisos, numero
+
+
+def generar_word(p: Proyecto, titulo: str = "Memoria fotográfica", columnas: int = 2) -> tuple[bytes, list[str]]:
+    from docx import Document
+    from docx.shared import Cm
+
+    doc = Document()
+    for lado in ("left_margin", "right_margin"):
+        setattr(doc.sections[0], lado, Cm(2))
+    avisos, _ = escribir_seccion(doc, p, titulo, columnas)
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue(), avisos

@@ -323,20 +323,21 @@ def obtener(p: Proyecto, analisis_id: int | None = None) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ Word
-def a_word(p: Proyecto, analisis_id: int | None = None) -> bytes:
-    from docx import Document
+def registro_al_vuelo(p: Proyecto) -> dict[str, Any]:
+    """Capítulo por plantilla sin guardarlo (cuando aún no se ha generado ninguna versión)."""
+    a = analizar(p)
+    return {"metricas": a, "capitulo": {"secciones": redactar_plantilla(a)}, "cifras_no_respaldadas": []}
+
+
+def escribir_capitulo(doc: Any, r: dict[str, Any]) -> None:
+    """Escribe el Capítulo 5 (texto, tablas y figura) de un registro de ``obtener`` en un documento existente."""
     from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_COLOR_INDEX
     from docx.shared import Cm, Pt
 
-    r = obtener(p, analisis_id)
     a = r["metricas"]
-    marcar = {}
+    marcar: dict[str, set[str]] = {}
     for c in r["cifras_no_respaldadas"]:
         marcar.setdefault(c["seccion"], set()).add(c["cifra"])
-
-    doc = Document()
-    for lado in ("left_margin", "right_margin"):
-        setattr(doc.sections[0], lado, Cm(2.5))
     doc.add_heading("5. ANÁLISIS DE DISPERSIÓN DE HIDROCARBUROS", level=1)
 
     def parrafo(texto: str, cifras: set[str]) -> None:
@@ -400,6 +401,16 @@ def a_word(p: Proyecto, analisis_id: int | None = None) -> bytes:
             tabla("Tabla 5.3. Matriz de susceptibilidad a la migración.", ["Factor", "Susceptibilidad", "Justificación"],
                   [[x["factor"], x["nivel"].capitalize(), x["justificacion"]] for x in a["matriz"]],
                   nota=a["criterio_tamizaje"])
+
+
+def a_word(p: Proyecto, analisis_id: int | None = None) -> bytes:
+    from docx import Document
+    from docx.shared import Cm
+
+    doc = Document()
+    for lado in ("left_margin", "right_margin"):
+        setattr(doc.sections[0], lado, Cm(2.5))
+    escribir_capitulo(doc, obtener(p, analisis_id))
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()

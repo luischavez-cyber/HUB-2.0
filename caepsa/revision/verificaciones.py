@@ -132,10 +132,13 @@ def verificar_estructura(doc: Documento, hay_excedencias: bool) -> list[Hallazgo
 # --------------------------------------------------------------------------- conteos
 def verificar_conteos(doc: Documento, n_muestras: int, n_puntos: int) -> list[Hallazgo]:
     h: list[Hallazgo] = []
+    # Menciones calificadas («5 puntos con excedencia», «7 muestras exceden») son subconjuntos, no totales.
+    calificador = (r"(?!(?:\s+de\s+muestreo)?\s+(?:por|en cada|de cada|con|que|donde|exced|super|rebas|cumpl|present|"
+                   r"indeterminad|de la periferia|adicional))")
     for etiqueta, patron, real in (
-        ("muestras", re.compile(r"\b(\d{1,3})\s+muestras\b(?!\s+(?:por|en cada|de cada))", re.I), n_muestras),
-        ("puntos de muestreo", re.compile(r"\b(\d{1,3})\s+puntos(?:\s+de\s+muestreo)?\b(?!\s+(?:por|de cada))",
-                                          re.I), n_puntos),
+        ("muestras", re.compile(rf"\b(\d{{1,3}})\s+muestras\b{calificador}", re.I), n_muestras),
+        ("puntos de muestreo", re.compile(rf"\b(\d{{1,3}})\s+puntos(?:\s+de\s+muestreo)?\b{calificador}", re.I),
+         n_puntos),
     ):
         menciones = [(b, m, int(m.group(1))) for b, m in _buscar(doc, patron)]
         valores = sorted({v for _, _, v in menciones})
@@ -406,6 +409,34 @@ def verificar_fechas(doc: Documento, p: Proyecto, hoy: date | None = None) -> li
     return h
 
 
+# --------------------------------------------------------------------------- información pendiente
+_RE_PENDIENTE = re.compile(r"\[(?:COMPLETAR|DATO PENDIENTE)[^\]]*\]")
+
+
+def verificar_pendientes(doc: Documento) -> list[Hallazgo]:
+    """Marcadores de información por completar: uno crítico global y uno por sección afectada."""
+    encontrados = [(b, m.group()) for b in doc.bloques for m in _RE_PENDIENTE.finditer(b.texto)]
+    if not encontrados:
+        return []
+    por_seccion: dict[str, list[tuple[Bloque, str]]] = {}
+    for b, m in encontrados:
+        por_seccion.setdefault(b.seccion, []).append((b, m))
+    h = [Hallazgo(
+        "automatica", "insuficiente", "critica", "Documento completo",
+        f"El documento contiene {len(encontrados)} marcador(es) de información por completar en "
+        f"{len(por_seccion)} sección(es); no está listo para ingreso.",
+        evidencia=encontrados[0][1], riesgo="Prevención por información incompleta.",
+        recomendacion="Completar todos los marcadores [COMPLETAR…]/[DATO PENDIENTE…] antes del ingreso.",
+        evidencia_localizada=True)]
+    for seccion, items in por_seccion.items():
+        h.append(Hallazgo(
+            "automatica", "insuficiente", "media", seccion,
+            f"{len(items)} dato(s) por completar en «{seccion}».", evidencia=items[0][1],
+            recomendacion="Completar con la información de campo o documental correspondiente.",
+            evidencia_localizada=True))
+    return h
+
+
 # --------------------------------------------------------------------------- orquestación
 def verificar(doc: Documento, p: Proyecto, hoy: date | None = None) -> list[Hallazgo]:
     usos = p.usos_suelo()
@@ -419,4 +450,5 @@ def verificar(doc: Documento, p: Proyecto, hoy: date | None = None) -> list[Hall
         h += verificar_tablas(doc, p, usos, {m.muestra: m for m in evaluadas})
     h += verificar_afirmaciones(doc, evaluadas, usos)
     h += verificar_fechas(doc, p, hoy)
+    h += verificar_pendientes(doc)
     return h

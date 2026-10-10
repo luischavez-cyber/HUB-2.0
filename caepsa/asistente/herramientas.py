@@ -16,6 +16,8 @@ from ..dispersion import capitulo as capitulo5
 from ..dispersion import medio_fisico as mf
 from ..dispersion.analisis import analizar as analizar_dispersion
 from ..exportacion.tablas import a_excel, a_word
+from ..informe.generador import generar_y_registrar as generar_informe_completo
+from ..informe.generador import verificacion_previa
 from ..fotografia.clasificador import CATEGORIAS, MAX_PALABRAS, contar_palabras
 from ..fotografia.registro import actualizar_fotografia, clasificar_fotografias, listar_fotografias
 from ..fotografia.seccion import generar_word as seccion_fotografica_word
@@ -178,6 +180,16 @@ DEFINICIONES: list[dict[str, Any]] = [
      "description": "Genera el Capítulo 5 (Análisis de dispersión de hidrocarburos) en Word con tablas y figura. "
                     "Con usar_ia=true lo redacta con IA y marca las cifras sin respaldo en los datos.",
      "input_schema": _obj({"usar_ia": {"type": "boolean"}})},
+    {"name": "verificar_insumos_informe",
+     "description": "Verificación previa a la generación del informe: estado de ficha, resultados, fotografías, "
+                    "medio físico, Capítulo 5, delimitación y última revisión técnica.",
+     "input_schema": _obj({})},
+    {"name": "generar_informe",
+     "description": "Genera el Informe de Caracterización completo en Word (portada, índice, capítulos 1 a 10 y "
+                    "anexos) con los datos de todos los módulos, opcionalmente sobre la plantilla Word de CAEPSA "
+                    "(documento tipo plantilla_word). Lo guarda como borrador y, con revisar=true, le aplica la "
+                    "revisión técnica automática. Lo no sustentado por datos queda como [COMPLETAR: …].",
+     "input_schema": _obj({"plantilla_id": {"type": "integer"}, "revisar": {"type": "boolean"}})},
     {"name": "consultar_bitacora", "description": "Últimos cambios registrados (quién, cuándo, antes/después).",
      "input_schema": _obj({"limite": {"type": "integer"}})},
 ]
@@ -456,6 +468,18 @@ def _generar_capitulo5(ctx: Contexto, usar_ia: bool = True) -> Any:
             "pendientes": r["metricas"].get("pendientes", [])}
 
 
+def _verificar_insumos_informe(ctx: Contexto) -> Any:
+    return verificacion_previa(ctx.abrir())
+
+
+def _generar_informe(ctx: Contexto, plantilla_id: int | None = None, revisar: bool = True) -> Any:
+    r = generar_informe_completo(ctx.abrir(), plantilla_id=plantilla_id, revisar=revisar)
+    ctx.archivos_generados.append(Path(r["ruta"]))
+    pendientes = r.pop("pendientes")
+    r.pop("ruta")
+    return {**r, "datos_por_completar": len(pendientes), "ejemplos_por_completar": list(dict.fromkeys(pendientes))[:15]}
+
+
 def _crear_version(ctx: Contexto, etiqueta: str) -> Any:
     return {"version": ctx.abrir().crear_instantanea(etiqueta).name}
 
@@ -491,6 +515,8 @@ IMPLEMENTACIONES: dict[str, Callable[..., Any]] = {
     "actualizar_medio_fisico": _actualizar_medio_fisico,
     "analizar_dispersion": _analizar_dispersion,
     "generar_capitulo5": _generar_capitulo5,
+    "verificar_insumos_informe": _verificar_insumos_informe,
+    "generar_informe": _generar_informe,
     "crear_version": _crear_version,
     "consultar_bitacora": _consultar_bitacora,
 }
